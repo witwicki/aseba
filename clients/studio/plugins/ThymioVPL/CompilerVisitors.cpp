@@ -646,18 +646,27 @@ namespace Aseba { namespace ThymioVPL
 		static const int noteTable[6] = { 262, 311, 370, 440, 524, 0 };
 		static const int durationTable[3] = {-1, 8, 15};
 		
-		// TODO: maybe, find last non-silent note
+		// find last non-silent note
+		unsigned noteCount(block->valuesCount());
+		assert(noteCount > 0);
+		while ((noteCount > 0) && ((block->getValue(noteCount-1) & 0xff) == 5))
+			--noteCount;
 		
+		// if there is no note, return
+		if (noteCount == 0)
+			return indentText() + L"# zero notes in sound block\n";
+		
+		// generate code for notes
 		wstring notesCopyText;
 		wstring durationsCopyText;
 		unsigned accumulatedDuration(0);
 		unsigned activeNoteCount(0);
-		for (unsigned i = 0; i<block->valuesCount(); ++i)
+		for (unsigned i = 0; i<noteCount; ++i)
 		{
 			const unsigned note(block->getValue(i) & 0xff);
 			const unsigned duration((block->getValue(i)>>8) & 0xff);
 			
-			if (note == 5 && i+1 < block->valuesCount() && (block->getValue(i+1) & 0xff) == 5)
+			if (note == 5 && i+1 < noteCount && (block->getValue(i+1) & 0xff) == 5)
 			{
 				// next note is silence, skip
 				accumulatedDuration += durationTable[duration];
@@ -665,19 +674,15 @@ namespace Aseba { namespace ThymioVPL
 			else
 			{
 				notesCopyText += toWstring(noteTable[note]);
-				if (i+1 != block->valuesCount())
+				if (i+1 != noteCount)
 					notesCopyText += L", ";
 				durationsCopyText += toWstring(durationTable[duration]+accumulatedDuration);
-				if (i+1 != block->valuesCount())
+				if (i+1 != noteCount)
 					durationsCopyText += L", ";
 				++activeNoteCount;
 				accumulatedDuration = 0;
 			}
 		}
-		
-		// if only one active note it means there is only silence, do not produce code
-		//if (activeNoteCount == 1)
-		//	return L"";
 		
 		// enable sound
 		useSound = true;
